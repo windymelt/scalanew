@@ -12,6 +12,8 @@ import com.monovore.decline._
 import com.monovore.decline.effect._
 import cats.effect.{IO, ExitCode}
 import scala.util.control.Exception._
+import cats.data.Validated.Valid
+import cats.data.Validated.Invalid
 
 object ScalaNew
     extends CommandIOApp(
@@ -23,22 +25,32 @@ object ScalaNew
       Opts.argument[String]("template")
 
     template.map { (t) =>
-      IO.println(s"using template $t !") >> ensuringSoftwares >>
-        ExitCode.Success.pure
-
+      IO.println(s"using template $t !") >> ensuringSoftwares >>= {
+        case Valid(a)   => ExitCode.Success.pure
+        case Invalid(e) => IO.println(s"err: $e") >> ExitCode.Error.pure
+      }
     }
   }
 
   // TODO: skip, parallel
-  lazy val ensuringSoftwares = ensuringSbt >> ensuringGh
+  lazy val ensuringSoftwares = for {
+    sbt <- ensuringSbt
+    gh <- ensuringGh
+    ghq <- ensuringGhq
+  } yield sbt *> gh *> ghq
 
 // ensuring softwares
   lazy val ensuringSbt = IO.println("checking sbt...") >> IO {
-    allCatch opt { os.proc("sbt", "--version").call() }
+    allCatch opt {
+      os.proc("sbt", "--version").call()
+    } toValid ("cannot call sbt")
   }
 
   lazy val ensuringGh = IO.println("checking gh...") >> IO {
-    allCatch opt { os.proc("gh").call() }
+    allCatch opt { os.proc("gh").call() } toValid ("cannot call gh")
   }
 
+  lazy val ensuringGhq = IO.println("checking ghq...") >> IO {
+    allCatch opt { os.proc("ghq").call() } toValid ("cannot call ghq")
+  }
 }
