@@ -1,0 +1,7 @@
+.ammonite
+.bsp
+.metals
+.scala-build
+.vscode
+target/*
+project/target/*
